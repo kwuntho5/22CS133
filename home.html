@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.css" />
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.js"></script>
+    <style>
+      #map {
+        height: 800px;
+        width: 100%;
+       }
+    </style>
+    <title>Business Location Recommendation System Based on LBSNs</title>
+    
+    
+  </head>
+  <body>
+    <h3>Business Location Recommendation System Based on LBSNs</h3>
+    <div align="right">
+        <a href="userGuide.html" target="_blank">User Guide</a>
+    </div>
+    
+    <table>
+        <tr id="filter_col1" data-column="1">
+            <td><label for="category">Category of Business</label></td>
+            <td>
+                <select name="cat" id="col1_filter" onChange="changetextbox();" class="column_filter">
+                    <option selected disabled>-select-</option>
+                    <option value="Food">Food</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Travel">Travel</option>
+                    <option value="Shop">Shop</option>
+                    <option value="Nightlife">Nightlife</option>
+                    <option value="Sport">Sport</option>
+                    <option value="Outdoor">Outdoor</option>
+                    <option value="Art">Art</option>
+                </select>
+            </td>
+        </tr>
+        <tr id="filter_col2" data-column="0">
+            <td><label for="area">Candidate Market Area (001-900)</label></td>
+            <td><input type="text" id="col0_filter" class="column_filter"></td>
+        </tr>
+        
+    </table>
+    <div id="map"></div>
+    <hr>
+        <table id="myTable" style="width:100%" class="display">
+            <thead>
+                <tr>
+                    <th>Area</th>
+                    <th>Category</th>
+                    <th>Diversity</th>
+                    <th>Competitiveness</th>
+                    <th>Relevacne</th>
+                    <th>Passenger Flow</th>
+                    <th>Overall</th>
+                    <th>Lantitude</th>
+                    <th>Longitude</th>
+                    <th>Map Location</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    
+    <script>
+        $(document).ready(function () {
+    // Setup - add a text input to each footer cell
+    $('#myTable thead tr')
+        .clone(true)
+        .addClass('filters')
+        .appendTo('#myTable thead');
+ 
+    var d = $('#myTable').DataTable({
+        ajax: 'Result.json',
+        order: [[6, 'desc']],
+        columns: [
+            { data: 'Area' },
+            { data: 'Category' },
+            { data: 'Diversity' },
+            { data: 'Competitiveness' },
+            { data: 'Relevacne' },
+            { data: 'Passenger Flow' },
+            { data: 'Overall' },
+            { sortable: false,data: 'Lantitude' },
+            { sortable: false,data: 'Longitude' },
+            { data: 'Longitude',sortable: false,
+                render: function ( data, row, full, meta ) {
+                    return '<button onclick="ZoomAndCenter(40.730610,'+ data +')">Map</button>';
+                 }},
+        ],
+        
+        orderCellsTop: true,
+        fixedHeader: true,
+        initComplete: function () {
+            var api = this.api();
+ 
+            // For each column
+            api
+                .columns()
+                .eq(0)
+                .each(function (colIdx) {
+                    // Set the header cell to contain the input element
+                    var cell = $('.filters th').eq(
+                        $(api.column(colIdx).header()).index()
+                    );
+                    var title = $(cell).text();
+                    $(cell).html('<input type="text" placeholder="' + title + '" />');
+ 
+                    // On every keypress in this input
+                    $(
+                        'input',
+                        $('.filters th').eq($(api.column(colIdx).header()).index())
+                    )
+                        .off('keyup change')
+                        .on('change', function (e) {
+                            // Get the search value
+                            $(this).attr('title', $(this).val());
+                            var regexr = '({search})'; //$(this).parents('th').find('select').val();
+ 
+                            var cursorPosition = this.selectionStart;
+                            // Search the column for that value
+                            api
+                                .column(colIdx)
+                                .search(
+                                    this.value != ''
+                                        ? regexr.replace('{search}', '(((' + this.value + ')))')
+                                        : '',
+                                    this.value != '',
+                                    this.value == ''
+                                )
+                                .draw();
+                        })
+                        .on('keyup', function (e) {
+                            e.stopPropagation();
+ 
+                            $(this).trigger('change');
+                            $(this)
+                                .focus()[0]
+                                .setSelectionRange(cursorPosition, cursorPosition);
+                        });
+                });
+        },
+    });
+    $('input.column_filter').on('keyup click', function () {
+        filterColumn($(this).parents('tr').attr('data-column'));
+    });
+    $('select.column_filter').on('change', function () {
+        
+        filterColumn($(this).parents('tr').attr('data-column'));
+    });
+    
+});
+        function filterColumn(i) {
+            $('#myTable')
+                .DataTable()
+                .column(i)
+                .search(
+                    $('#col' + i + '_filter').val()
+                )
+                .draw();
+        }
+        function display(){
+
+        }
+
+    </script>
+    <script>
+        var map;
+        function initMap() {
+            const geocoder = new google.maps.Geocoder();
+            const infowindow = new google.maps.InfoWindow();
+            var uluru = {lat: 40.730610, lng: -73.935242};
+            
+            map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 14,
+            center: uluru
+            });
+            var marker = new google.maps.Marker({
+            position: uluru,
+            map: map
+            });
+            // Create the initial InfoWindow.
+            let infoWindow = new google.maps.InfoWindow({
+                content: "Click the map to get Lat/Lng!",
+                position: myLatlng,
+            });
+
+            infoWindow.open(map);
+
+            // Configure the click listener.
+            map.addListener("click", (mapsMouseEvent) => {
+                // Close the current InfoWindow.
+                infoWindow.close();
+
+                // Create a new InfoWindow.
+                infoWindow = new google.maps.InfoWindow({
+                    position: mapsMouseEvent.latLng,
+                });
+                infoWindow.setContent(
+                    JSON.stringify(mapsMouseEvent.latLng.toJSON(), null, 2)
+                );
+                infoWindow.open(map);
+            });
+        }
+        
+        
+        function _geocoder(address, callback){
+            geocoder.geocode({
+                address: address
+            }, function(results, status) {
+            if (status == google.maps.GeocoderStatus.OK) {
+                loaction = results[0].geometry.location;
+                callback(loaction);
+            }
+            });
+        }
+        function ZoomAndCenter(lat,lng) {
+            
+            map.setZoom(16);
+            
+            map.setCenter(
+                new google.maps.LatLng(lat, lng)
+            );
+          
+        }
+    </script>
+    <script>
+        function changetextbox()
+        {
+            
+        if (document.getElementById("col1_filter").value == "Travel"||document.getElementById("col1_filter").value == "Sport"||document.getElementById("col1_filter").value == "Outdoor"|| document.getElementById("col1_filter").value == "Art"){
+            document.getElementById("col0_filter").disabled='true';
+            document.getElementById("col0_filter").value='';
+        } else {
+            document.getElementById("col0_filter").disabled='';
+        }
+        }
+        </script>
+    <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap">
+    </script>
+    
+  </body>
+</html>
